@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Fidon</title>
+
+    <!-- PWA / Installable App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Fidon">
+    <meta name="theme-color" content="#6366f1">
+    <link id="appleIcon" rel="apple-touch-icon" href="">
+    <link id="manifestLink" rel="manifest" href="">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes confetti {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-float { animation: float ease-in-out infinite; }
+        .animate-confetti { animation: confetti ease-in forwards; }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        .animate-slideUp { animation: slideUp 0.4s ease-out; }
+        .gradient-text {
+            background: linear-gradient(to right, #6366f1, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        body.dark-mode {
+            background: linear-gradient(to bottom right, #1a202c, #6b21a8, #1a202c);
+        }
+        body:not(.dark-mode) {
+            background: linear-gradient(to bottom right, #6366f1, #a855f7, #ec4899);
+        }
+        .card-light { background: white; }
+        .card-dark { background: #1f2937; border: 1px solid #374151; }
+        /* Safe area padding for installed full-screen app on notch phones */
+        body {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #installBanner {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 transition-colors duration-500">
+    <div id="confetti-container" class="fixed inset-0 pointer-events-none z-50"></div>
+
+    <!-- Install App Banner -->
+    <div id="installBanner" class="hidden">
+        <div class="max-w-6xl mx-auto m-4 bg-gray-900 text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📲</span>
+                <div>
+                    <div class="font-bold">Install Fidon</div>
+                    <div class="text-xs opacity-75">Add to your home screen, use it like a real app</div>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="dismissInstallBanner()" class="px-3 py-2 rounded-lg text-sm opacity-75 hover:opacity-100">Later</button>
+                <button onclick="installApp()" class="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-bold text-sm">Install</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Particles Background -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute w-2 h-2 bg-white opacity-20 rounded-full animate-float" style="left: 10%; top: 20%; animation-delay: 0s; animation-duration: 8s;"></div>
+        <div class="absolute w-2 h-2 bg-white opacity-20 rounded-full animate-float" style="left: 80%; top: 40%; animation-delay: 1s; animation-duration: 10s;"></div>
+        <div class="absolute w-2 h-2 bg-white opacity-20 rounded-full animate-float" style="left: 30%; top: 60%; animation-delay: 2s; animation-duration: 12s;"></div>
+        <div class="absolute w-2 h-2 bg-white opacity-20 rounded-full animate-float" style="left: 70%; top: 80%; animation-delay: 3s; animation-duration: 9s;"></div>
+        <div class="absolute w-2 h-2 bg-white opacity-20 rounded-full animate-float" style="left: 50%; top: 30%; animation-delay: 4s; animation-duration: 11s;"></div>
+    </div>
+
+    <div class="max-w-6xl mx-auto relative z-10">
+        <!-- Header Card -->
+        <div id="mainCard" class="card-light rounded-3xl shadow-2xl p-6 mb-4 transform hover:scale-105 transition-all duration-300">
+            <div class="flex justify-between items-center mb-2">
+                <div>
+                    <h1 class="text-4xl font-black gradient-text">FIDON'S BUDGET MASTER</h1>
+                    <p class="text-gray-500 text-sm mt-1">Professional Financial Command Center</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="toggleDarkMode()" class="p-3 hover:bg-gray-100 rounded-full transition transform hover:rotate-180 duration-500">
+                        <span id="themeIcon">🌙</span>
+                    </button>
+                    <button onclick="showStatsModal()" class="p-3 hover:bg-gray-100 rounded-full transition">
+                        📊
+                    </button>
+                    <button onclick="showSettingsModal()" class="p-3 hover:bg-gray-100 rounded-full transition">
+                        ⚙️
+                    </button>
+                </div>
+            </div>
+
+            <!-- Date Display -->
+            <div class="text-center mb-4">
+                <div class="text-sm text-gray-500 mb-1 flex items-center justify-center gap-2">
+                    📅 Current Session
+                </div>
+                <div class="flex items-center justify-center gap-3">
+                <button onclick="previousDay()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold hover:bg-indigo-600">← Previous</button>
+                <input type="date" id="datePicker" onchange="changeDate()" class="px-4 py-2 border-2 border-indigo-300 rounded-lg font-semibold text-gray-700 cursor-pointer">
+                <button onclick="nextDay()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold hover:bg-indigo-600">Next →</button>
+                </div>
+            </div>
+
+            <!-- Main Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <!-- Available Budget -->
+                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white transform hover:scale-105 hover:rotate-1 transition-all duration-300 shadow-2xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span>🎯</span>
+                        <div class="text-sm opacity-90">Available Today</div>
+                    </div>
+                    <div id="availableToday" class="text-4xl font-black mb-1">0</div>
+                    <div id="currencyDisplay1" class="text-sm opacity-75">TSH</div>
+                    <div class="mt-3 w-full bg-white bg-opacity-20 rounded-full h-2">
+                        <div id="availableBar" class="bg-white rounded-full h-2 transition-all duration-500" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- Today's Spent -->
+                <div class="bg-gradient-to-br from-pink-500 to-red-600 rounded-2xl p-6 text-white transform hover:scale-105 hover:rotate-1 transition-all duration-300 shadow-2xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span>💸</span>
+                        <div class="text-sm opacity-90">Today's Spent</div>
+                    </div>
+                    <div class="text-4xl font-black mb-1 flex items-center gap-2">
+                        <span>📉</span>
+                        <span id="todaySpent">0</span>
+                    </div>
+                    <div id="currencyDisplay2" class="text-sm opacity-75">TSH</div>
+                    <div id="savingsRate" class="mt-3 text-sm font-semibold">100% saved today 🎯</div>
+                </div>
+
+                <!-- Rolling Balance -->
+                <div id="rollingCard" class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-6 text-white transform hover:scale-105 hover:rotate-1 transition-all duration-300 shadow-2xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span>⚡</span>
+                        <div class="text-sm opacity-90">Rolling Balance</div>
+                    </div>
+                    <div class="text-4xl font-black mb-1 flex items-center gap-2">
+                        <span id="rollingIcon">📈</span>
+                        <span id="rollingBalance">0</span>
+                    </div>
+                    <div id="currencyDisplay3" class="text-sm opacity-75">TSH</div>
+                    <div id="rollingStatus" class="mt-3 text-sm font-semibold">💪 Crushing it!</div>
+                </div>
+            </div>
+
+            <!-- Total Wallet Card -->
+            <div class="bg-gradient-to-br from-yellow-500 to-orange-600 rounded-2xl p-6 text-white transform hover:scale-105 transition-all duration-300 shadow-2xl mb-4">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">💰</span>
+                        <div class="text-sm opacity-90">TOTAL WALLET</div>
+                    </div>
+                    <button onclick="showWalletModal()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg font-bold transition">
+                        ⚙️ Edit
+                    </button>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-3">
+                    <div>
+                        <div class="text-xs opacity-75">Started With</div>
+                        <div id="totalBudget" class="text-lg font-black">0</div>
+                    </div>
+                    <div>
+                        <div class="text-xs opacity-75">Total Spent</div>
+                        <div id="totalSpent" class="text-lg font-black">0</div>
+                    </div>
+                    <div>
+                        <div class="text-xs opacity-75">Remaining</div>
+                        <div id="walletRemaining" class="text-lg font-black">0</div>
+                    </div>
+                </div>
+                <div class="w-full bg-white bg-opacity-20 rounded-full h-3">
+                    <div id="walletBar" class="bg-white rounded-full h-3 transition-all duration-500" style="width: 100%"></div>
+                </div>
+                <div id="walletWarning" class="mt-2 text-sm font-semibold text-center"></div>
+            </div>
+
+            <!-- Achievements -->
+            <div id="achievementBadges" class="mb-4 flex gap-2 flex-wrap justify-center"></div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="showAddExpenseModal()" class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl py-4 px-4 font-bold flex items-center justify-center gap-2 transition transform hover:scale-105 shadow-lg">
+                    ➕ Add Expense
+                </button>
+                <button onclick="startNewDay()" class="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl py-4 px-4 font-bold flex items-center justify-center gap-2 transition transform hover:scale-105 shadow-lg">
+                    📅 New Day
+                </button>
+            </div>
+        </div>
+
+        <!-- Today's Expenses Card -->
+        <div id="expensesCard" class="card-light rounded-3xl shadow-2xl p-6 transform hover:scale-105 transition-all duration-300">
+            <h2 class="text-2xl font-black text-gray-800 mb-4 flex items-center gap-2">
+                📋 Today's Expenses
+            </h2>
+            <div id="expensesList"></div>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div id="addExpenseModal" class="hidden fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div class="card-light rounded-3xl p-8 w-full max-w-md transform animate-slideUp shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-3xl font-black text-gray-800">Add Expense</h3>
+                <button onclick="hideAddExpenseModal()" class="p-2 hover:bg-gray-100 rounded-full transform hover:rotate-90 transition-all duration-300">
+                    ❌
+                </button>
+            </div>
+            <div class="space-y-4">
+                <input type="number" id="expenseAmount" class="w-full px-4 py-4 border-2 border-indigo-300 rounded-xl focus:border-indigo-500 outline-none text-lg font-bold" placeholder="Amount">
+                <input type="text" id="expenseDescription" class="w-full px-4 py-4 border-2 border-indigo-300 rounded-xl focus:border-indigo-500 outline-none" placeholder="Description">
+                <input type="text" id="expenseCategory" class="w-full px-4 py-4 border-2 border-indigo-300 rounded-xl focus:border-indigo-500 outline-none" placeholder="Category (e.g., food, transport, rent)">
+                <button onclick="addExpense()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white py-4 rounded-xl font-black transition transform hover:scale-105 shadow-lg text-lg">
+                    💰 Add Expense
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div class="card-light rounded-3xl p-8 w-full max-w-md transform animate-slideUp shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-3xl font-black text-gray-800">⚙️ Settings</h3>
+                <button onclick="hideSettingsModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    ❌
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-bold text-gray-800 mb-2">💰 Daily Cap</label>
+                    <input type="number" id="dailyCapInput" class="w-full px-4 py-4 border-2 border-indigo-300 rounded-xl focus:border-indigo-500 outline-none font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-800 mb-2">💵 Currency</label>
+                    <input type="text" id="currencyInput" class="w-full px-4 py-4 border-2 border-indigo-300 rounded-xl focus:border-indigo-500 outline-none font-bold">
+                </div>
+                <button onclick="clearAllData()" class="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-black transition mt-4">
+                🗑️ Clear All Data
+                </button>
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl">
+                    <div class="text-gray-800 font-bold mb-2">🎨 Theme</div>
+                    <div class="flex gap-2">
+                        <button onclick="setLightMode()" class="flex-1 py-3 rounded-xl font-bold transition bg-gray-200 text-gray-700 hover:bg-indigo-500 hover:text-white">
+                            ☀️ Light
+                        </button>
+                        <button onclick="setDarkMode()" class="flex-1 py-3 rounded-xl font-bold transition bg-gray-200 text-gray-700 hover:bg-gray-800 hover:text-white">
+                            🌙 Dark
+                        </button>
+                    </div>
+                </div>
+                <button onclick="saveSettings()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white py-4 rounded-xl font-black transition transform hover:scale-105 shadow-lg text-lg">
+                    ✅ Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="statsModal" class="hidden fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-y-auto">
+        <div class="card-light rounded-3xl p-8 w-full max-w-4xl transform animate-slideUp shadow-2xl my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-3xl font-black text-gray-800">📊 Fidon's Analytics</h3>
+                <button onclick="hideStatsModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    ❌
+                </button>
+            </div>
+            <div id="statsContent" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Stats will be generated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Modal -->
+    <div id="walletModal" class="hidden fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div class="card-light rounded-3xl p-8 w-full max-w-md transform animate-slideUp shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-3xl font-black text-gray-800">💰 Wallet Settings</h3>
+                <button onclick="hideWalletModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    ❌
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-bold text-gray-800 mb-2">💵 Total Budget (Starting Amount)</label>
+                    <input type="number" id="totalBudgetInput" class="w-full px-4 py-4 border-2 border-yellow-300 rounded-xl focus:border-yellow-500 outline-none font-bold text-lg">
+                    <p class="text-xs text-gray-500 mt-1">How much money you actually have</p>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-xl">
+                    <div class="text-sm font-bold text-gray-800 mb-2">💡 Quick Actions</div>
+                    <button onclick="addToWallet()" class="w-full mb-2 bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold transition">
+                        ➕ Add Money to Wallet
+                    </button>
+                    <button onclick="resetWallet()" class="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-bold transition">
+                        🔄 Reset Wallet
+                    </button>
+                </div>
+                <button onclick="saveWalletSettings()" class="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white py-4 rounded-xl font-black transition transform hover:scale-105 shadow-lg text-lg">
+                    ✅ Save Wallet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ PWA SETUP (makes this installable on your phone) ============
+        let deferredInstallPrompt = null;
+
+        function setupPWA() {
+            // Build a manifest on the fly (so this single file works as an installable app)
+            const manifest = {
+                name: "Fidon",
+                short_name: "Fidon",
+                start_url: ".",
+                display: "standalone",
+                background_color: "#6366f1",
+                theme_color: "#6366f1",
+                icons: [
+                    { src: makeIconDataUrl(192), sizes: "192x192", type: "image/png" },
+                    { src: makeIconDataUrl(512), sizes: "512x512", type: "image/png" }
+                ]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            document.getElementById('manifestLink').setAttribute('href', manifestUrl);
+            document.getElementById('appleIcon').setAttribute('href', makeIconDataUrl(180));
+
+            // Register a tiny inline service worker so it can work offline once installed
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', e => self.skipWaiting());
+                    self.addEventListener('activate', e => self.clients.claim());
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(
+                            fetch(e.request).catch(() => caches.match(e.request))
+                        );
+                    });
+                `;
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration skipped:', err));
+            }
+        }
+
+        // Draws a simple "F" logo icon at the requested size, returns a data URL
+        function makeIconDataUrl(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createLinearGradient(0, 0, size, size);
+            grad.addColorStop(0, '#6366f1');
+            grad.addColorStop(1, '#a855f7');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold ' + Math.floor(size * 0.55) + 'px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('F', size / 2, size / 2 + size * 0.05);
+            return canvas.toDataURL('image/png');
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            document.getElementById('installBanner').classList.remove('hidden');
+        });
+
+        function installApp() {
+            document.getElementById('installBanner').classList.add('hidden');
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                deferredInstallPrompt = null;
+            } else {
+                alert('📲 To install: tap your browser menu (⋮ or Share icon) → "Add to Home Screen"');
+            }
+        }
+
+        function dismissInstallBanner() {
+            document.getElementById('installBanner').classList.add('hidden');
+        }
+
+        setupPWA();
+
+        // ============ STATE ============
+        let expenses = [];
+        let dailyCap = 5000;
+        let currency = 'TSH';
+        let currentDate = new Date().toISOString().split('T')[0];
+        let darkMode = false;
+        let achievements = [];
+        let totalBudget = 0;
+
+        // Load data on start
+        loadData();
+        updateUI();
+
+        function loadData() {
+            const saved = localStorage.getItem('fidon-budget-data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                expenses = data.expenses || [];
+                dailyCap = data.dailyCap || 5000;
+                currency = data.currency || 'TSH';
+                currentDate = data.currentDate || new Date().toISOString().split('T')[0];
+                darkMode = data.darkMode || false;
+                achievements = data.achievements || [];
+                totalBudget = data.totalBudget || 0;
+
+                if (darkMode) {
+                    document.body.classList.add('dark-mode');
+                    document.getElementById('themeIcon').textContent = '☀️';
+                }
+            }
+        }
+
+        function saveData() {
+            const data = {
+                expenses,
+                dailyCap,
+                currency,
+                currentDate,
+                darkMode,
+                achievements,
+                totalBudget
+            };
+            localStorage.setItem('fidon-budget-data', JSON.stringify(data));
+        }
+
+        function getTodayExpenses() {
+            return expenses.filter(e => e.date === currentDate);
+        }
+
+        function getTodayTotal() {
+            return getTodayExpenses().reduce((sum, e) => sum + e.amount, 0);
+        }
+
+        function getRollingBalance() {
+            const dates = [...new Set(expenses.map(e => e.date))].sort();
+            let balance = 0;
+
+            dates.forEach(date => {
+                const dayTotal = expenses.filter(e => e.date === date).reduce((sum, e) => sum + e.amount, 0);
+                balance += (dailyCap - dayTotal);
+            });
+
+            return balance;
+        }
+
+        function getTodayAvailable() {
+            const rollingBalance = getRollingBalance();
+            const todayTotal = getTodayTotal();
+            const previousBalance = rollingBalance - (dailyCap - todayTotal);
+            return previousBalance + dailyCap - todayTotal;
+        }
+
+        function updateUI() {
+            const todayTotal = getTodayTotal();
+            const todayAvailable = getTodayAvailable();
+            const rollingBalance = getRollingBalance();
+            const savingsRate = dailyCap > 0 ? ((dailyCap - todayTotal) / dailyCap * 100) : 0;
+
+            document.getElementById('availableToday').textContent = todayAvailable.toLocaleString();
+            document.getElementById('todaySpent').textContent = todayTotal.toLocaleString();
+            document.getElementById('rollingBalance').textContent = Math.abs(rollingBalance).toLocaleString();
+            document.getElementById('savingsRate').textContent = savingsRate.toFixed(1) + '% saved today 🎯';
+
+            document.getElementById('currencyDisplay1').textContent = currency;
+            document.getElementById('currencyDisplay2').textContent = currency;
+            document.getElementById('currencyDisplay3').textContent = currency;
+
+            const rollingCard = document.getElementById('rollingCard');
+            const rollingIcon = document.getElementById('rollingIcon');
+            const rollingStatus = document.getElementById('rollingStatus');
+
+            if (rollingBalance >= 0) {
+                rollingCard.className = 'bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-6 text-white transform hover:scale-105 hover:rotate-1 transition-all duration-300 shadow-2xl';
+                rollingIcon.textContent = '📈';
+                rollingStatus.textContent = '💪 Crushing it!';
+            } else {
+                rollingCard.className = 'bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-6 text-white transform hover:scale-105 hover:rotate-1 transition-all duration-300 shadow-2xl';
+                rollingIcon.textContent = '📉';
+                rollingStatus.textContent = '⚠️ Watch spending';
+            }
+
+            const availableBar = document.getElementById('availableBar');
+            const percentage = Math.min((todayAvailable / dailyCap) * 100, 100);
+            availableBar.style.width = percentage + '%';
+
+            document.getElementById('datePicker').value = currentDate;
+
+            updateExpensesList();
+            checkAchievements();
+            updateAchievementBadges();
+
+            document.getElementById('dailyCapInput').value = dailyCap;
+            document.getElementById('currencyInput').value = currency;
+
+            updateWalletDisplay();
+            updateCardThemes();
+        }
+
+        function updateCardThemes() {
+            const cards = [
+                document.getElementById('mainCard'),
+                document.getElementById('expensesCard'),
+                document.querySelectorAll('#addExpenseModal > div')[0],
+                document.querySelectorAll('#settingsModal > div')[0],
+                document.querySelectorAll('#statsModal > div')[0],
+                document.querySelectorAll('#walletModal > div')[0]
+            ];
+
+            cards.forEach(card => {
+                if (card) {
+                    if (darkMode) {
+                        card.classList.remove('card-light');
+                        card.classList.add('card-dark');
+                        card.querySelectorAll('.text-gray-800').forEach(el => {
+                            el.classList.remove('text-gray-800');
+                            el.classList.add('text-white');
+                        });
+                        card.querySelectorAll('.text-gray-500').forEach(el => {
+                            el.classList.remove('text-gray-500');
+                            el.classList.add('text-gray-400');
+                        });
+                    } else {
+                        card.classList.remove('card-dark');
+                        card.classList.add('card-light');
+                        card.querySelectorAll('.text-white').forEach(el => {
+                            if (!el.closest('.bg-gradient-to-br, .bg-gradient-to-r')) {
+                                el.classList.remove('text-white');
+                                el.classList.add('text-gray-800');
+                            }
+                        });
+                        card.querySelectorAll('.text-gray-400').forEach(el => {
+                            el.classList.remove('text-gray-400');
+                            el.classList.add('text-gray-500');
+                        });
+                    }
+                }
+            });
+        }
+
+        function updateExpensesList() {
+            const list = document.getElementById('expensesList');
+            const todayExpenses = getTodayExpenses();
+
+            if (todayExpenses.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4 animate-bounce">🎉</div>
+                        <div class="text-gray-400 text-lg">No expenses today. Fidon is on FIRE! 🔥</div>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = todayExpenses.map((expense, index) => `
+                <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 mb-3 transform hover:scale-102 transition-all duration-200 hover:shadow-lg" style="animation-delay: ${index * 0.1}s">
+                    <div class="flex justify-between items-center">
+                        <div class="flex-1 flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-full bg-purple-500"></div>
+                            <div>
+                                <div class="font-black text-lg text-gray-800">
+                                    ${expense.amount.toLocaleString()} ${currency}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    ${expense.description} • ${expense.category}
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="deleteExpense(${expense.id})" class="p-2 hover:bg-red-100 rounded-lg transition transform hover:scale-110">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showAddExpenseModal() {
+            document.getElementById('addExpenseModal').classList.remove('hidden');
+        }
+
+        function hideAddExpenseModal() {
+            document.getElementById('addExpenseModal').classList.add('hidden');
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDescription').value = '';
+            document.getElementById('expenseCategory').value = '';
+        }
+
+        function addExpense() {
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const description = document.getElementById('expenseDescription').value || 'No description';
+            const category = document.getElementById('expenseCategory').value || 'other';
+
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid amount!');
+                return;
+            }
+
+            const expense = {
+                id: Date.now(),
+                amount,
+                description,
+                category,
+                date: currentDate,
+                timestamp: new Date().toISOString()
+            };
+
+            expenses.push(expense);
+            saveData();
+            updateUI();
+            hideAddExpenseModal();
+        }
+
+        function deleteExpense(id) {
+            if (confirm('Delete this expense?')) {
+                expenses = expenses.filter(e => e.id !== id);
+                saveData();
+                updateUI();
+            }
+        }
+
+        function startNewDay() {
+            const tomorrow = new Date(currentDate);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            currentDate = tomorrow.toISOString().split('T')[0];
+            saveData();
+            updateUI();
+        }
+
+        function previousDay() {
+            const prev = new Date(currentDate);
+            prev.setDate(prev.getDate() - 1);
+            currentDate = prev.toISOString().split('T')[0];
+            saveData();
+            updateUI();
+        }
+
+        function nextDay() {
+            const next = new Date(currentDate);
+            next.setDate(next.getDate() + 1);
+            currentDate = next.toISOString().split('T')[0];
+            saveData();
+            updateUI();
+        }
+
+        function changeDate() {
+            currentDate = document.getElementById('datePicker').value;
+            saveData();
+            updateUI();
+        }
+
+        function showSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function hideSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            dailyCap = parseFloat(document.getElementById('dailyCapInput').value) || 5000;
+            currency = document.getElementById('currencyInput').value || 'TSH';
+            saveData();
+            updateUI();
+            hideSettingsModal();
+        }
+
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            if (darkMode) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('themeIcon').textContent = '☀️';
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.getElementById('themeIcon').textContent = '🌙';
+            }
+            saveData();
+            updateUI();
+        }
+
+        function setLightMode() {
+            darkMode = false;
+            document.body.classList.remove('dark-mode');
+            document.getElementById('themeIcon').textContent = '🌙';
+            saveData();
+            updateUI();
+        }
+
+        function setDarkMode() {
+            darkMode = true;
+            document.body.classList.add('dark-mode');
+            document.getElementById('themeIcon').textContent = '☀️';
+            saveData();
+            updateUI();
+        }
+
+        function showStatsModal() {
+            document.getElementById('statsModal').classList.remove('hidden');
+            updateStats();
+        }
+
+        function hideStatsModal() {
+            document.getElementById('statsModal').classList.add('hidden');
+        }
+
+        function updateStats() {
+            const uniqueDays = [...new Set(expenses.map(e => e.date))].length;
+            const totalExpenses = expenses.length;
+            const bestDay = Math.max(...[...new Set(expenses.map(e => e.date))].map(date =>
+                dailyCap - expenses.filter(e => e.date === date).reduce((sum, e) => sum + e.amount, 0)
+            ), 0);
+            const streak = getConsecutiveDaysUnderBudget();
+
+            document.getElementById('statsContent').innerHTML = `
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl">
+                    <div class="text-sm text-gray-500 mb-1">Total Days</div>
+                    <div class="text-2xl font-black text-gray-800">${uniqueDays}</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl">
+                    <div class="text-sm text-gray-500 mb-1">Total Expenses</div>
+                    <div class="text-2xl font-black text-gray-800">${totalExpenses}</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl">
+                    <div class="text-sm text-gray-500 mb-1">Best Day Saved</div>
+                    <div class="text-2xl font-black text-gray-800">${bestDay.toLocaleString()}</div>
+                </div>
+                <div class="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-xl">
+                    <div class="text-sm text-gray-500 mb-1">Current Streak</div>
+                    <div class="text-2xl font-black text-gray-800">${streak} days</div>
+                </div>
+            `;
+        }
+
+        function getConsecutiveDaysUnderBudget() {
+            const sortedDates = [...new Set(expenses.map(e => e.date))].sort().reverse();
+            let streak = 0;
+
+            for (const date of sortedDates) {
+                const dayTotal = expenses.filter(e => e.date === date).reduce((sum, e) => sum + e.amount, 0);
+                if (dayTotal < dailyCap) streak++;
+                else break;
+            }
+
+            return streak;
+        }
+
+        function clearAllData() {
+            if (confirm('⚠️ DELETE EVERYTHING? This cannot be undone!')) {
+                localStorage.removeItem('fidon-budget-data');
+                expenses = [];
+                dailyCap = 5000;
+                currency = 'TSH';
+                achievements = [];
+                totalBudget = 0;
+                alert('All data cleared! 🗑️');
+                updateUI();
+            }
+        }
+
+        function checkAchievements() {
+            const newAchievements = [...achievements];
+
+            if (expenses.length >= 10 && !newAchievements.includes('first_10')) {
+                newAchievements.push('first_10');
+                triggerConfetti();
+            }
+
+            if (getRollingBalance() >= dailyCap * 7 && !newAchievements.includes('week_saver')) {
+                newAchievements.push('week_saver');
+                triggerConfetti();
+            }
+
+            const streak = getConsecutiveDaysUnderBudget();
+            if (streak >= 7 && !newAchievements.includes('week_streak')) {
+                newAchievements.push('week_streak');
+                triggerConfetti();
+            }
+
+            achievements = newAchievements;
+            saveData();
+        }
+
+        function updateAchievementBadges() {
+            const container = document.getElementById('achievementBadges');
+            let html = '';
+
+            if (achievements.includes('first_10')) {
+                html += '<div class="bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold flex items-center gap-2 animate-pulse">🏆 First 10 Expenses!</div>';
+            }
+            if (achievements.includes('week_saver')) {
+                html += '<div class="bg-green-400 text-green-900 px-4 py-2 rounded-full font-bold flex items-center gap-2 animate-pulse">🥇 Week Saver!</div>';
+            }
+            if (achievements.includes('week_streak')) {
+                html += '<div class="bg-purple-400 text-purple-900 px-4 py-2 rounded-full font-bold flex items-center gap-2 animate-pulse">🔥 7 Day Streak!</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function triggerConfetti() {
+            const container = document.getElementById('confetti-container');
+            container.innerHTML = '';
+
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'absolute w-3 h-3 animate-confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.top = '-10%';
+                confetti.style.backgroundColor = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'][Math.floor(Math.random() * 4)];
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+                container.appendChild(confetti);
+            }
+
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 4000);
+        }
+
+        // ============ WALLET FUNCTIONS ============
+        function getTotalSpent() {
+            return expenses.reduce((sum, e) => sum + e.amount, 0);
+        }
+
+        function getWalletRemaining() {
+            return totalBudget - getTotalSpent();
+        }
+
+        function updateWalletDisplay() {
+            const totalSpent = getTotalSpent();
+            const remaining = getWalletRemaining();
+            const percentage = totalBudget > 0 ? (remaining / totalBudget * 100) : 100;
+
+            document.getElementById('totalBudget').textContent = totalBudget.toLocaleString();
+            document.getElementById('totalSpent').textContent = totalSpent.toLocaleString();
+            document.getElementById('walletRemaining').textContent = remaining.toLocaleString();
+            document.getElementById('walletBar').style.width = Math.max(percentage, 0) + '%';
+
+            const warningEl = document.getElementById('walletWarning');
+            if (remaining < 0) {
+                warningEl.textContent = '⚠️ OVERSPENT! ' + Math.abs(remaining).toLocaleString() + ' ' + currency + ' over budget!';
+                warningEl.className = 'mt-2 text-sm font-semibold text-center bg-red-500 bg-opacity-30 px-3 py-1 rounded-lg';
+            } else if (remaining < totalBudget * 0.2 && totalBudget > 0) {
+                warningEl.textContent = '⚠️ Low funds! Only ' + remaining.toLocaleString() + ' ' + currency + ' left!';
+                warningEl.className = 'mt-2 text-sm font-semibold text-center bg-yellow-500 bg-opacity-30 px-3 py-1 rounded-lg';
+            } else if (totalBudget === 0) {
+                warningEl.textContent = '💡 Set your total budget to start tracking!';
+                warningEl.className = 'mt-2 text-sm font-semibold text-center';
+            } else {
+                warningEl.textContent = '✅ Looking good! ' + percentage.toFixed(0) + '% remaining';
+                warningEl.className = 'mt-2 text-sm font-semibold text-center';
+            }
+
+            document.getElementById('totalBudgetInput').value = totalBudget;
+        }
+
+        function showWalletModal() {
+            document.getElementById('walletModal').classList.remove('hidden');
+            updateWalletDisplay();
+        }
+
+        function hideWalletModal() {
+            document.getElementById('walletModal').classList.add('hidden');
+        }
+
+        function saveWalletSettings() {
+            totalBudget = parseFloat(document.getElementById('totalBudgetInput').value) || 0;
+            saveData();
+            updateWalletDisplay();
+            hideWalletModal();
+        }
+
+        function addToWallet() {
+            const amount = prompt('💰 How much money do you want to ADD to your wallet?');
+            if (amount && !isNaN(amount)) {
+                totalBudget += parseFloat(amount);
+                saveData();
+                updateWalletDisplay();
+                alert('✅ Added ' + parseFloat(amount).toLocaleString() + ' ' + currency + ' to wallet!');
+            }
+        }
+
+        function resetWallet() {
+            if (confirm("⚠️ Reset wallet to current total spent? This will set your budget to match what you've already spent.")) {
+                totalBudget = getTotalSpent();
+                saveData();
+                updateWalletDisplay();
+                alert('✅ Wallet reset!');
+            }
+        }
+    </script>
+</body>
+</html>
