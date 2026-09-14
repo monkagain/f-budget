@@ -328,15 +328,70 @@
     </div>
 
     <script>
+        // ============ PWA SETUP (makes this installable on your phone) ============
         let deferredInstallPrompt = null;
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+
+        function setupPWA() {
+            // Build a manifest on the fly (so this single file works as an installable app)
+            const manifest = {
+                name: "Fidon's Budget Master",
+                short_name: "Fidon Budget",
+                start_url: ".",
+                display: "standalone",
+                background_color: "#6366f1",
+                theme_color: "#6366f1",
+                icons: [
+                    { src: makeIconDataUrl(192), sizes: "192x192", type: "image/png" },
+                    { src: makeIconDataUrl(512), sizes: "512x512", type: "image/png" }
+                ]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            document.getElementById('manifestLink').setAttribute('href', manifestUrl);
+            document.getElementById('appleIcon').setAttribute('href', makeIconDataUrl(180));
+
+            // Register a tiny inline service worker so it can work offline once installed
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', e => self.skipWaiting());
+                    self.addEventListener('activate', e => self.clients.claim());
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(
+                            fetch(e.request).catch(() => caches.match(e.request))
+                        );
+                    });
+                `;
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration skipped:', err));
+            }
         }
+
+        // Draws a simple "F" logo icon at the requested size, returns a data URL
+        function makeIconDataUrl(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createLinearGradient(0, 0, size, size);
+            grad.addColorStop(0, '#6366f1');
+            grad.addColorStop(1, '#a855f7');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold ' + Math.floor(size * 0.55) + 'px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('F', size / 2, size / 2 + size * 0.05);
+            return canvas.toDataURL('image/png');
+        }
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredInstallPrompt = e;
             document.getElementById('installBanner').classList.remove('hidden');
         });
+
         function installApp() {
             document.getElementById('installBanner').classList.add('hidden');
             if (deferredInstallPrompt) {
@@ -346,9 +401,12 @@
                 alert('📲 To install: tap your browser menu (⋮ or Share icon) → "Add to Home Screen"');
             }
         }
+
         function dismissInstallBanner() {
             document.getElementById('installBanner').classList.add('hidden');
         }
+
+        setupPWA();
 
         // ============ STATE ============
         let expenses = [];
@@ -358,7 +416,6 @@
         let darkMode = false;
         let achievements = [];
         let totalBudget = 0;
-        let startDate = null;
 
         // Load data on start
         loadData();
@@ -375,17 +432,11 @@
                 darkMode = data.darkMode || false;
                 achievements = data.achievements || [];
                 totalBudget = data.totalBudget || 0;
-                startDate = data.startDate || null;
 
                 if (darkMode) {
                     document.body.classList.add('dark-mode');
                     document.getElementById('themeIcon').textContent = '☀️';
                 }
-            }
-
-            if (!startDate) {
-                const allDates = expenses.map(e => e.date);
-                startDate = allDates.length > 0 ? allDates.sort()[0] : currentDate;
             }
         }
 
@@ -397,8 +448,7 @@
                 currentDate,
                 darkMode,
                 achievements,
-                totalBudget,
-                startDate
+                totalBudget
             };
             localStorage.setItem('fidon-budget-data', JSON.stringify(data));
         }
@@ -412,20 +462,13 @@
         }
 
         function getRollingBalance() {
-            if (!startDate) return 0;
-            const from = startDate < currentDate ? startDate : currentDate;
-            const to = startDate < currentDate ? currentDate : startDate;
-
+            const dates = [...new Set(expenses.map(e => e.date))].sort();
             let balance = 0;
-            let d = new Date(from + 'T00:00:00');
-            const endD = new Date(to + 'T00:00:00');
 
-            while (d <= endD) {
-                const dateStr = d.toISOString().split('T')[0];
-                const dayTotal = expenses.filter(e => e.date === dateStr).reduce((sum, e) => sum + e.amount, 0);
+            dates.forEach(date => {
+                const dayTotal = expenses.filter(e => e.date === date).reduce((sum, e) => sum + e.amount, 0);
                 balance += (dailyCap - dayTotal);
-                d.setDate(d.getDate() + 1);
-            }
+            });
 
             return balance;
         }
